@@ -38,6 +38,7 @@ var tmpEle = null;
 
     jQuery.fn.mentiony = function (method, options) {
         var defaults = {
+            url: '',
             debug:              0, // Set 1 to see console log message of this plugin
 
             /**
@@ -47,9 +48,9 @@ var tmpEle = null;
             applyInitialSize:   true,
 
             globalTimeout:      null, // Don't overwrite this config
-            timeOut:            400, // Do mention only when user input idle time > this value
+            timeOut:            300, // Do mention only when user input idle time > this value
             triggerChar:        '@', // @keyword-to-mention
-
+            minChars: '3',
             /**
              * Function for mention data processing
              * @param mode
@@ -57,6 +58,12 @@ var tmpEle = null;
              * @param onDataRequestCompleteCallback
              */
             onDataRequest: function (mode, keyword, onDataRequestCompleteCallback) {
+
+            },
+
+
+
+            onTyping: function(event, elmInputBoxContent, text, length){
 
             },
 
@@ -98,14 +105,13 @@ var tmpEle = null;
                 popover:          '<div id="mentiony-popover-[ID]" class="mentiony-popover"></div>',
                 list:             '<ul id="mentiony-popover-[ID]" class="mentiony-list"></ul>',
                 listItem:         '<li class="mentiony-item" data-item-id="">' +
-                                  '<div class="row">' +
-                                  '<div class="col-xs-3 col-sm-3 col-md-3 col-lg-3">' +
+                                  '<div class="image-frame">' +
                                   '<img src="https://avatars2.githubusercontent.com/u/1859127?v=3&s=140">' +
                                   '</div>' +
-                                  '<div class="pl0 col-xs-9 col-sm-9 col-md-9 col-lg-9">' +
+                                  '<div class="details">' +
                                   '<p class="title">Company name</p>' +
-                                  '<p class="help-block">Addition information</p>' +
-                                  '</div>' +
+                                  '<p class="username">Username</p>' +
+                                  '<p class="email">Email</p>' +
                                   '</div>' +
                                   '</li>',
                 normalText:       '<span class="normal-text">&nbsp;</span>',
@@ -133,12 +139,45 @@ var tmpEle = null;
         });
     };
 
+    var utils = {
+        //Encodes the character with _.escape function (undersocre)
+        htmlEncode       : function (str) {
+            return _.escape(str);
+        },
+        highlightTerm    : function (value, term) {
+            if (!term && !term.length) {
+                return value;
+            }
+            return value.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + term + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<b>$1</b>");
+        },
+        setCaretAtEnd : function(el) {
+            el.focus();
+            if (typeof window.getSelection != "undefined"
+                && typeof document.createRange != "undefined") {
+                var range = document.createRange();
+                range.selectNodeContents(el);
+                range.collapse(false);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else if (typeof document.body.createTextRange != "undefined") {
+                var textRange = document.body.createTextRange();
+                textRange.moveToElementText(el);
+                textRange.collapse(false);
+                textRange.select();
+            }
+        },
+        //Deletes the white spaces
+        rtrim: function(string) {
+            return string.replace(/\s+$/,"");
+        }
+    };
+
     var MentionsInput = function (settings) {
-        var elmInputBoxContainer, elmInputBoxContent, elmInputBox,
+        var request,elmInputBoxContainer, elmInputBoxContent, elmInputBox,
             elmInputBoxInitialWidth, elmInputBoxInitialHeight,
             editableContentLineHeightPx,
             popoverEle, list, elmInputBoxId,
-            elmInputBoxContentAbsPosition = {top: 0, left: 0},
             dropDownShowing = false,
             events          = {
                 keyDown:  false,
@@ -191,7 +230,7 @@ var tmpEle = null;
             if (typeof placeholderText === 'undefined') {
                 placeholderText = elmInputBox.text();
             }
-            elmInputBoxContent.attr('data-placeholder', placeholderText);
+            elmInputBoxContent.attr('placeholder', placeholderText);
 
             elmInputBoxContainer.append(elmInputBox.clone().addClass('mention-input-hidden'));
             elmInputBoxContainer.append(elmInputBoxContent);
@@ -219,8 +258,9 @@ var tmpEle = null;
 
             elmInputBoxContent.css({minHeight: elmInputBoxInitialHeight + 'px'});
 
-            elmInputBoxContentAbsPosition = elmInputBoxContent.offset();
-            editableContentLineHeightPx = parseInt($(elmInputBoxContent.css('line-height')).selector);
+            editableContentLineHeightPx = parseInt(elmInputBoxContent.css('line-height'));
+
+            list.on('mousedown', 'li', onListItemClick);
 
             // This event occured from top to down.
             // When press a key: onInputBoxKeyDown --> onInputBoxKeyPress --> onInputBoxInput --> onInputBoxKeyUp
@@ -301,9 +341,16 @@ var tmpEle = null;
             if (needMention) {
                 // Update mention keyword only inputing(not enter), left, right
                 if (e.keyCode !== KEY.RETURN && (events.input || e.keyCode === KEY.LEFT || e.keyCode === KEY.RIGHT)) {
-                    updateMentionKeyword(e);
-                    doSearchAndShow();
+
+                    if(text().length >= settings.minChars + 1) {
+                        updateMentionKeyword(e);
+                        doSearchAndShow();
+                    }
                 }
+            }
+
+            if(settings.onTyping){
+                settings.onTyping.call(this, e, elmInputBoxContent, text(), text().length);
             }
 
             settings.onKeyUp.call(this, e, elmInputBox, elmInputBoxContent);
@@ -320,7 +367,9 @@ var tmpEle = null;
 
         function onInputBoxBlur(e) {
             // log('onInputBoxBlur');
-
+            if(dropDownShowing){
+                hideDropDown();
+            }
             settings.onBlur.call(this, e, elmInputBox, elmInputBoxContent);
         }
 
@@ -366,25 +415,77 @@ var tmpEle = null;
             return text.replace(/(&nbsp;)+/g, ' ');
         }
 
+        function text(){
+            return elmInputBoxContent.text().trim();;
+        }
+
+        function ajax(){
+
+            if(request){
+                request.abort();
+            }
+
+            request = $.getJSON(settings.url, {query: currentMention.keyword}, function(response) {
+
+                var data = response;
+
+                /**
+                data = jQuery.grep(data, function( item ) {
+                    return item.name.toLowerCase().indexOf(currentMention.keyword.toLowerCase()) > -1;
+                });
+                **/
+
+                // Call this to populate mention.
+                onDataRequestCompleteCallback.call(this, data);
+
+            });
+
+        }
+
         /**
          * Handle User search action with timeout, and show mention if needed
          */
         function doSearchAndShow() {
 
-            if (settings.timeOut > 0) {
-                if (settings.globalTimeout !== null) {
-                    clearTimeout(settings.globalTimeout);
+            if(settings.url){
+
+                if (settings.timeOut > 0) {
+                    if (settings.globalTimeout !== null) {
+                        clearTimeout(settings.globalTimeout);
+                    }
+                    settings.globalTimeout = setTimeout(function () {
+
+                        settings.globalTimeout = null;
+
+                        ajax();
+
+                    }, settings.timeOut);
+
+                } else {
+
+                    ajax();
+
                 }
-                settings.globalTimeout = setTimeout(function () {
-                    settings.globalTimeout = null;
 
+            }else{
+
+                if (settings.timeOut > 0) {
+                    if (settings.globalTimeout !== null) {
+                        clearTimeout(settings.globalTimeout);
+                    }
+                    settings.globalTimeout = setTimeout(function () {
+                        settings.globalTimeout = null;
+
+                        settings.onDataRequest.call(this, 'search', currentMention.keyword, onDataRequestCompleteCallback);
+
+                    }, settings.timeOut);
+
+                } else {
                     settings.onDataRequest.call(this, 'search', currentMention.keyword, onDataRequestCompleteCallback);
+                }
 
-                }, settings.timeOut);
-
-            } else {
-                settings.onDataRequest.call(this, 'search', currentMention.keyword, onDataRequestCompleteCallback);
             }
+
         }
 
         /**
@@ -406,9 +507,10 @@ var tmpEle = null;
                     var listItem = $(settings.templates.listItem);
                     listItem.attr('data-item-id', item.id);
                     listItem.find('img:first').attr('src', item.avatar);
-                    listItem.find('p.title:first').html(item.name);
-                    listItem.find('p.help-block:first').html(item.info);
-                    listItem.bind('click', onListItemClick);
+                    listItem.find('p.title:first').html(utils.highlightTerm(utils.htmlEncode(item.name), keyword));
+                    listItem.find('p.username:first').html(utils.highlightTerm(utils.htmlEncode(item.username_alias), keyword));
+                    //listItem.find('p.email:first').html(utils.highlightTerm(utils.htmlEncode(item.email), keyword));
+                    //listItem.bind('click', onListItemClick);
                     list.append(listItem);
                 });
 
@@ -421,12 +523,13 @@ var tmpEle = null;
          * Show popover box contain result item
          */
         function showDropDown() {
+            var elmInputBoxContentAbsPosition = elmInputBoxContent.offset();
             var curAbsPos = getSelectionCoords();
             dropDownShowing = true;
             popoverEle.css({
                 display: 'block',
-                top:     curAbsPos.y - (elmInputBoxContentAbsPosition.top - $(document).scrollTop()) + (editableContentLineHeightPx + 10),
-                left:    curAbsPos.x - elmInputBoxContentAbsPosition.left
+                top:     curAbsPos.y_start - (elmInputBoxContentAbsPosition.top - $(document).scrollTop()) + (editableContentLineHeightPx),
+                left:    curAbsPos.x_start - elmInputBoxContentAbsPosition.left
             });
         }
 
@@ -562,6 +665,25 @@ var tmpEle = null;
             setSelectedMention(item);
         }
 
+
+        function placeCaretAtEnd(el) {
+            el.focus();
+            if (typeof window.getSelection != "undefined"
+                && typeof document.createRange != "undefined") {
+                var range = document.createRange();
+                range.selectNodeContents(el);
+                range.collapse(false);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else if (typeof document.body.createTextRange != "undefined") {
+                var textRange = document.body.createTextRange();
+                textRange.moveToElementText(el);
+                textRange.collapse(false);
+                textRange.select();
+            }
+        }
+
         /**
          * Handle UI and data when user chose an mention option.
          */
@@ -597,8 +719,14 @@ var tmpEle = null;
             needMention = false; // Reset mention state
             currentMention.keyword = ''; // reset current Data if start with @
 
+
             hideDropDown();
             updateDataInputData();
+
+            _.defer(function(){
+                utils.setCaretAtEnd(elmInputBoxContent.get(0));
+            });
+
         }
 
         function log(msg, prefix, level) {
@@ -732,13 +860,15 @@ var tmpEle = null;
         win = win || window;
         var doc = win.document;
         var sel = doc.selection, range, rects, rect;
-        var x = 0, y = 0;
+        var x_start = 0, x_end = 0, y_start = 0, y_end = 0;
         if (sel) {
             if (sel.type != "Control") {
                 range = sel.createRange();
                 range.collapse(true);
-                x = range.boundingLeft;
-                y = range.boundingTop;
+                x_start = range.boundingLeft;
+                x_end  = range.boundingLeft + range.boundingWidth;
+                y_start = range.boundingTop;
+                y_end = range.boundingTop + range.boundingHeight;
             }
         } else if (win.getSelection) {
             sel = win.getSelection();
@@ -751,11 +881,15 @@ var tmpEle = null;
                     if (rects.length > 0) {
                         rect = rects[0];
                     }
-                    x = rect.left;
-                    y = rect.top;
+                    if(rect) {
+                        x_start = rect.left;
+                        x_end = rect.right;
+                        y_start = rect.top;
+                        y_end = rect.bottom;
+                    }
                 }
                 // Fall back to inserting a temporary element
-                if (x == 0 && y == 0) {
+                if (x_start == 0 && y_start == 0) {
                     var span = doc.createElement("span");
                     if (span.getClientRects) {
                         // Ensure span has dimensions and position by
@@ -763,8 +897,14 @@ var tmpEle = null;
                         span.appendChild(doc.createTextNode("\u200b"));
                         range.insertNode(span);
                         rect = span.getClientRects()[0];
-                        x = rect.left;
-                        y = rect.top;
+
+                        if(rect) {
+                            x_start = rect.left;
+                            x_end = rect.right;
+                            y_start = rect.top;
+                            y_end = rect.bottom;
+                        }
+
                         var spanParent = span.parentNode;
                         spanParent.removeChild(span);
 
@@ -774,7 +914,7 @@ var tmpEle = null;
                 }
             }
         }
-        return {x: x, y: y};
+        return {x_start: x_start, x_end: x_end, y_start: y_start, y_end: y_end};
     }
 
     /**
