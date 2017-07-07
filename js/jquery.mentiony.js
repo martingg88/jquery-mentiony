@@ -10,6 +10,7 @@
 var tmpEle = null;
 
 (function ($) {
+
     var KEY = {
         AT:              64,
         BACKSPACE:       8,
@@ -34,109 +35,6 @@ var tmpEle = null;
         PAGE_DOWN:       34,
         PAGE_UP:         33,
         PERIOD:          190,
-    };
-
-    jQuery.fn.mentiony = function (method, options) {
-        var defaults = {
-            url: '',
-            debug:              0, // Set 1 to see console log message of this plugin
-
-            /**
-             * True [default] will make mention area size equal to initial size of textarea. NOTE: Textarea must visible on document ready if this value is true.
-             * False will not specify the CSS width attribute to every mention area.
-             */
-            applyInitialSize:   true,
-
-            globalTimeout:      null, // Don't overwrite this config
-            timeOut:            300, // Do mention only when user input idle time > this value
-            triggerChar:        '@', // @keyword-to-mention
-            minChars: '3',
-            /**
-             * Function for mention data processing
-             * @param mode
-             * @param keyword
-             * @param onDataRequestCompleteCallback
-             */
-            onDataRequest: function (mode, keyword, onDataRequestCompleteCallback) {
-
-            },
-
-
-
-            onTyping: function(event, elmInputBoxContent, text, length){
-
-            },
-
-            /**
-             * Addition keyboard event handle for old and new input
-             * Why we need this:
-             *  • Because some original js was binded to textarea, we need to bind it to contenteditable too.
-             *  • Useful when you wanna passing some event trigger of old element to new editable content
-             *  • Old input element already be trigger some event, then you need to pass some needed event to new editable element
-             * @param event
-             * @param oldInputEle
-             * @param newEditableEle
-             */
-            onKeyPress: function (event, oldInputEle, newEditableEle) {
-                oldInputEle.trigger(event);
-            },
-            onKeyUp:    function (event, oldInputEle, newEditableEle) {
-                oldInputEle.trigger(event);
-            },
-            onBlur:     function (event, oldInputEle, newEditableEle) {
-                oldInputEle.trigger(event);
-            },
-            onPaste:    function (event, oldInputEle, newEditableEle) {
-                oldInputEle.trigger(event);
-            },
-            onInput: function (oldInputEle, newEditableEle) {
-
-            },
-
-            // adjust popover relative position with its parent.
-            popoverOffset:      {
-                x: -30,
-                y: 0
-            },
-
-            templates:          {
-                container:        '<div id="mentiony-container-[ID]" class="mentiony-container"></div>',
-                content:          '<div id="mentiony-content-[ID]" class="mentiony-content" contenteditable="true"></div>',
-                popover:          '<div id="mentiony-popover-[ID]" class="mentiony-popover"></div>',
-                list:             '<ul id="mentiony-popover-[ID]" class="mentiony-list"></ul>',
-                listItem:         '<li class="mentiony-item" data-item-id="">' +
-                                  '<div class="image-frame">' +
-                                  '<img src="https://avatars2.githubusercontent.com/u/1859127?v=3&s=140">' +
-                                  '</div>' +
-                                  '<div class="details">' +
-                                  '<p class="title">Company name</p>' +
-                                  '<p class="username">Username</p>' +
-                                  '<p class="email">Email</p>' +
-                                  '</div>' +
-                                  '</li>',
-                normalText:       '<span class="normal-text">&nbsp;</span>',
-                highlight:        '<span class="highlight"></span>',
-                highlightContent: '<a href="[HREF]" data-item-id="[ITEM_ID]" class="mentiony-link">[TEXT]</a>',
-            }
-        };
-
-        if (typeof method === 'object' || !method) {
-            options = method;
-        }
-
-        var settings = $.extend({}, defaults, options);
-
-        return this.each(function () {
-            var instance = $.data(this, 'mentiony') || $.data(this, 'mentiony', new MentionsInput(settings));
-
-            if (typeof instance[method] === 'function') {
-                return instance[method].apply(this, Array.prototype.slice.call(outerArguments, 1));
-            } else if (typeof method === 'object' || !method) {
-                return instance.init.call(this, this);
-            } else {
-                $.error('Method ' + method + ' does not exist');
-            }
-        });
     };
 
     var utils = {
@@ -271,6 +169,7 @@ var tmpEle = null;
             elmInputBoxContent.bind('click', onInputBoxClick);
             elmInputBoxContent.bind('blur', onInputBoxBlur);
             elmInputBoxContent.bind('paste', onInputBoxPaste);
+
         }
 
         /**
@@ -706,6 +605,7 @@ var tmpEle = null;
             var highlightNode = $(settings.templates.highlight);
             var highlightContentNode = $(settings.templates.highlightContent
                 .replace('[HREF]', currentMentionItemData.href)
+                .replace('[TITLE]', currentMentionItemData.name)
                 .replace('[TEXT]', currentMentionItemData.name)
                 .replace('[ITEM_ID]', currentMentionItemData.id)
             );
@@ -845,9 +745,140 @@ var tmpEle = null;
             init: function (domTarget) {
                 initTextArea(domTarget);
             },
+            markup: function(target, cb){
+
+                var obj = {
+                    'text' : '',
+                    'id': [],
+                }
+
+                obj.text = target.val();
+
+                if(obj.text) {
+                    var reg = /data-item-id=\"[\s]*([0-9]*)[\s]*\"/gi;
+                    obj.text.replace(reg, function($0, $1, $2){
+                        var val = $1;
+                        if (obj.id.indexOf(val) == -1) {
+                            obj.id.push(val);
+                        }
+                    });
+                }
+
+                cb(obj);
+            },
+            clear: function(target, cb){
+                target.val('');
+                target.next().html('');
+                cb();
+            }
         };
     };
 
+    jQuery.fn.mentiony = function (method, options) {
+
+        var outerArguments = arguments;
+
+        var defaults = {
+            url: '',
+            debug:              0, // Set 1 to see console log message of this plugin
+
+            /**
+             * True [default] will make mention area size equal to initial size of textarea. NOTE: Textarea must visible on document ready if this value is true.
+             * False will not specify the CSS width attribute to every mention area.
+             */
+            applyInitialSize:   true,
+
+            globalTimeout:      null, // Don't overwrite this config
+            timeOut:            300, // Do mention only when user input idle time > this value
+            triggerChar:        '@', // @keyword-to-mention
+            minChars: '3',
+            /**
+             * Function for mention data processing
+             * @param mode
+             * @param keyword
+             * @param onDataRequestCompleteCallback
+             */
+            onDataRequest: function (mode, keyword, onDataRequestCompleteCallback) {
+
+            },
+
+
+
+            onTyping: function(event, elmInputBoxContent, text, length){
+
+            },
+
+            /**
+             * Addition keyboard event handle for old and new input
+             * Why we need this:
+             *  • Because some original js was binded to textarea, we need to bind it to contenteditable too.
+             *  • Useful when you wanna passing some event trigger of old element to new editable content
+             *  • Old input element already be trigger some event, then you need to pass some needed event to new editable element
+             * @param event
+             * @param oldInputEle
+             * @param newEditableEle
+             */
+            onKeyPress: function (event, oldInputEle, newEditableEle) {
+                oldInputEle.trigger(event);
+            },
+            onKeyUp:    function (event, oldInputEle, newEditableEle) {
+                oldInputEle.trigger(event);
+            },
+            onBlur:     function (event, oldInputEle, newEditableEle) {
+                oldInputEle.trigger(event);
+            },
+            onPaste:    function (event, oldInputEle, newEditableEle) {
+                oldInputEle.trigger(event);
+            },
+            onInput: function (oldInputEle, newEditableEle) {
+
+            },
+
+            // adjust popover relative position with its parent.
+            popoverOffset:      {
+                x: -30,
+                y: 0
+            },
+
+            templates:          {
+                container:        '<div id="mentiony-container-[ID]" class="mentiony-container"></div>',
+                content:          '<div id="mentiony-content-[ID]" class="mentiony-content" contenteditable="true"></div>',
+                popover:          '<div id="mentiony-popover-[ID]" class="mentiony-popover"></div>',
+                list:             '<ul id="mentiony-popover-[ID]" class="mentiony-list"></ul>',
+                listItem:         '<li class="mentiony-item" data-item-id="">' +
+                '<div class="image-frame">' +
+                '<img src="https://avatars2.githubusercontent.com/u/1859127?v=3&s=140">' +
+                '</div>' +
+                '<div class="details">' +
+                '<p class="title">Company name</p>' +
+                '<p class="username">Username</p>' +
+                '<p class="email">Email</p>' +
+                '</div>' +
+                '</li>',
+                normalText:       '<span class="normal-text">&nbsp;</span>',
+                highlight:        '<span class="highlight"></span>',
+                highlightContent: '<a href="[HREF]" title="[TITLE]" data-item-id="[ITEM_ID]" class="mentiony-link">[TEXT]</a>',
+            }
+        };
+
+        if (typeof method === 'object' || !method) {
+            options = method;
+        }
+
+        var settings = $.extend({}, defaults, options);
+
+        return this.each(function () {
+            var instance = $.data(this, 'mentiony') || $.data(this, 'mentiony', new MentionsInput(settings));
+
+            if (typeof instance[method] === 'function') {
+                return instance[method].apply(this, Array.prototype.slice.call(outerArguments, 1));
+            } else if (typeof method === 'object' || !method) {
+                return instance.init.call(this, this);
+            } else {
+                $.error('Method ' + method + ' does not exist');
+            }
+        });
+    };
 
     /**
      * Get current caret / selection absolute position (relative to viewport , not to parent)
