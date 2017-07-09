@@ -172,6 +172,7 @@ var tmpEle = null;
 
         }
 
+
         /**
          * Put all special key handle here
          * @param e
@@ -203,6 +204,23 @@ var tmpEle = null;
             // log('onInputBoxKeyPress');
             events.keyPress = true;
 
+            if(e.keyCode == KEY.RETURN) {
+                if (settings.isEnterToSubmit && settings.onEnterToSubmit) {
+
+                    if (text().length > 0) {
+
+                        elmInputBoxContent.parent().addClass('disabled');
+
+                        settings.onEnterToSubmit.call(this, e, elmInputBoxContent, text(), text().length, function () {
+                            elmInputBoxContent.parent().removeClass('disabled');
+                        });
+
+                    }
+
+                    return false;
+                }
+            }
+
             if (!needMention) {
                 // Try to check if need mention
                 needMention = (e.keyCode === KEY.AT);
@@ -230,6 +248,7 @@ var tmpEle = null;
          */
         function onInputBoxKeyUp(e) {
             // log('onInputBoxKeyUp');
+
             events.keyup = true;
             // log(events, 'events');
 
@@ -269,6 +288,7 @@ var tmpEle = null;
             if(dropDownShowing){
                 hideDropDown();
             }
+
             settings.onBlur.call(this, e, elmInputBox, elmInputBoxContent);
         }
 
@@ -745,6 +765,13 @@ var tmpEle = null;
             init: function (domTarget) {
                 initTextArea(domTarget);
             },
+            focus: function(target){
+
+                _.defer(function(){
+                    utils.setCaretAtEnd(target.get(0));
+                });
+
+            },
             markup: function(target, cb){
 
                 var obj = {
@@ -792,6 +819,7 @@ var tmpEle = null;
             timeOut:            300, // Do mention only when user input idle time > this value
             triggerChar:        '@', // @keyword-to-mention
             minChars: '3',
+            isEnterToSubmit: false,
             /**
              * Function for mention data processing
              * @param mode
@@ -803,8 +831,11 @@ var tmpEle = null;
             },
 
 
-
             onTyping: function(event, elmInputBoxContent, text, length){
+
+            },
+
+            onEnterToSubmit: function(event, elmInputBoxContent, text, length, done){
 
             },
 
