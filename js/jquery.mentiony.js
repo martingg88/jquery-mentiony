@@ -77,6 +77,7 @@ var tmpEle = null;
             editableContentLineHeightPx,
             popoverEle, list, elmInputBoxId,
             dropDownShowing = false,
+            inEnterMode = false,
             events          = {
                 keyDown:  false,
                 keyPress: false,
@@ -209,11 +210,17 @@ var tmpEle = null;
 
                     if (text().length > 0) {
 
-                        elmInputBoxContent.parent().addClass('disabled');
+                        if(!inEnterMode) {
 
-                        settings.onEnterToSubmit.call(this, e, elmInputBoxContent, text(), text().length, function () {
-                            elmInputBoxContent.parent().removeClass('disabled');
-                        });
+                            inEnterMode = true;
+
+                            elmInputBoxContent.parent().addClass('disabled');
+
+                            settings.onEnterToSubmit.call(this, e, elmInputBoxContent, text(), text().length, function () {
+                                elmInputBoxContent.parent().removeClass('disabled');
+                                inEnterMode = false;
+                            });
+                        }
 
                     }
 
