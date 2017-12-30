@@ -192,7 +192,53 @@ var tmpEle = null;
 
             if (dropDownShowing) {
                 return handleUserChooseOption(e);
+            }else{
+
+                if(settings.isAltEnterToNewLine) {
+
+                    if (e.altKey && e.keyCode == KEY.RETURN) {
+
+                        var selection, range;
+
+                        if (window.getSelection) {
+                            // IE9 and non-IE
+                            selection = window.getSelection();
+
+                            if (selection.getRangeAt && selection.rangeCount) {
+
+
+                                range = selection.getRangeAt(0);
+
+                                var br = document.createElement('br');
+
+                                range.deleteContents();
+                                range.insertNode(br);
+                                range.setStartAfter(br);
+                                range.setEndAfter(br);
+                                range.collapse(false);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                            }
+
+
+                        }else if ((selection = document.selection) && selection.type != "Control") {
+                            // IE < 9
+                            var originalRange = selection.createRange();
+                            originalRange.collapse(true);
+                            selection.createRange().pasteHTML('<br>');
+
+                        }
+
+                        updateDataInputData();
+
+                        return false;
+
+                    }
+
+                }
+
             }
+
         }
 
         /**
@@ -766,7 +812,6 @@ var tmpEle = null;
             return positionInfo;
         }
 
-
         // Public methods
         return {
             init: function (domTarget) {
@@ -777,6 +822,12 @@ var tmpEle = null;
                 _.defer(function(){
                     utils.setCaretAtEnd(target.get(0));
                 });
+
+            },
+            hasText:function(target, cb){
+
+
+                cb(target.val() ? true : false)
 
             },
             markup: function(target, cb){
@@ -827,6 +878,7 @@ var tmpEle = null;
             triggerChar:        '@', // @keyword-to-mention
             minChars: '3',
             isEnterToSubmit: false,
+            isAltEnterToNewLine: false,
             /**
              * Function for mention data processing
              * @param mode
