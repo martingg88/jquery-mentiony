@@ -208,21 +208,22 @@ var tmpEle = null;
 
 
                                 range = selection.getRangeAt(0);
-                                var br = '';
+                                var fragment = document.createDocumentFragment();
+                                var lastNode = '';
 
 
-                                if(range.startContainer.nextSibling || range.startContainer.textContent.substring(range.startOffset)){
-                                    br = document.createElement('br');
+                                if((range.startContainer.nextSibling && typeof range.startContainer.nextSibling.tagName != 'undefined') || range.startContainer.textContent.substring(range.startOffset)){
+                                    lastNode = fragment.appendChild(document.createElement('br'));
                                 }else{
-                                    br = document.createElement('div');
-                                    br.innerHTML = '<br />';
+                                    lastNode = fragment.appendChild(document.createElement('br'));
+                                    lastNode = fragment.appendChild(document.createElement('br'));
                                 }
 
 
                                 range.deleteContents();
-                                range.insertNode(br);
-                                range.setStartAfter(br);
-                                range.setEndAfter(br);
+                                range.insertNode(fragment);
+                                range.setStartAfter(lastNode);
+                                range.setEndAfter(lastNode);
                                 range.collapse(false);
 
                                 selection.removeAllRanges();
@@ -241,7 +242,7 @@ var tmpEle = null;
 
                         }
 
-                        updateDataInputData();
+                        updateDataInputData(e);
 
                         return false;
 
