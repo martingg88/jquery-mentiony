@@ -125,11 +125,21 @@ var tmpEle = null;
             elmInputBoxContent = $(settings.templates.content.replace('[ID]', inputId));
 
             // Make UI and hide the textarea
+
             var placeholderText = elmInputBox.attr('placeholder');
             if (typeof placeholderText === 'undefined') {
                 placeholderText = elmInputBox.text();
             }
-            elmInputBoxContent.attr('placeholder', placeholderText);
+
+            if(elmInputBox.val().trim()) {
+
+                elmInputBoxContent.html(elmInputBox.val());
+
+
+            }else {
+
+                elmInputBoxContent.attr('placeholder', placeholderText);
+            }
 
             elmInputBoxContainer.append(elmInputBox.clone().addClass('mention-input-hidden'));
             elmInputBoxContainer.append(elmInputBoxContent);
