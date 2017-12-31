@@ -135,7 +135,6 @@ var tmpEle = null;
 
                 elmInputBoxContent.html(elmInputBox.val());
 
-
             }else {
 
                 elmInputBoxContent.attr('placeholder', placeholderText);
