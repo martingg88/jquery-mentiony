@@ -208,16 +208,28 @@ var tmpEle = null;
 
 
                                 range = selection.getRangeAt(0);
+                                var br = '';
 
-                                var br = document.createElement('br');
+
+                                if(range.startContainer.nextSibling || range.startContainer.textContent.substring(range.startOffset)){
+                                    br = document.createElement('br');
+                                }else{
+                                    br = document.createElement('div');
+                                    br.innerHTML = '<br />';
+                                }
+
 
                                 range.deleteContents();
                                 range.insertNode(br);
                                 range.setStartAfter(br);
                                 range.setEndAfter(br);
                                 range.collapse(false);
+
                                 selection.removeAllRanges();
                                 selection.addRange(range);
+
+
+
                             }
 
 
